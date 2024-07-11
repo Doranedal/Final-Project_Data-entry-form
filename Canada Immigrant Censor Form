@@ -1,0 +1,236 @@
+import tkinter
+from tkinter import ttk
+from tkinter import messagebox
+from matplotlib import pyplot as plt
+import csv
+import sqlite3
+import json
+import os
+
+# Initialize SQLite database
+conn = sqlite3.connect('immigrant_data.db')
+c = conn.cursor()
+
+# Create table
+c.execute('''CREATE TABLE IF NOT EXISTS immigrants
+             (first_name text, last_name text, age integer, date_of_birth text, sex text, country text, ethnicity text, entry_date text, language text, visa_type text)''')
+conn.commit()
+
+
+if not os.path.isfile('immigrant_data.csv'):
+    with open('immigrant_data.csv', 'w') as file:
+        csvwriter = csv.writer(file)
+        csvwriter.writerow(['First Name', 'Last Name', 'Age', 'Date of Birth', 'Sex', 'Country', 'Ethnicity', 'Entry Date', 'Language', 'Visa Type'])
+
+def save_data():
+    if accept_terms_var.get() != "Accepted":
+        tkinter.messagebox.showwarning('Error', 'You have not accepted the terms and conditions')
+        return
+
+    fname = fnameentry.get()
+    lname = lnameentry.get()
+    age = agespinbox.get()
+    dob = dobentry.get()
+    sex = sexcombo.get()
+    country = countryorigincombo.get()
+    ethnicity = ethnicitycombo.get()
+    entrydate = entrydateentry.get()
+    language = languageentry.get()
+    visatype = visatypecombo.get()
+
+    if not fname or not lname:
+        tkinter.messagebox.showwarning('Error', 'First name and last name must be filled')
+        return
+
+    if not age or not dob:
+        tkinter.messagebox.showwarning('Error', 'Date of birth and age must be filled')
+        return
+
+    if not sex or not country:
+        tkinter.messagebox.showwarning('Error', 'Sex and country of origin must be filled')
+        return
+
+    if not ethnicity or not entrydate:
+        tkinter.messagebox.showwarning('Error', 'Ethnicity and entry date must be filled')
+        return
+
+    if not language or not visatype:
+        tkinter.messagebox.showwarning('Error', 'Language and visa type must be filled')
+        return
+
+    # Save to CSV
+    #ensure_file_exists()
+    with open('immigrant_data.csv', 'a') as file:
+        csvwriter = csv.writer(file)
+        csvwriter.writerow([fname, lname, age, dob, sex, country, ethnicity, entrydate, language, visatype])
+
+    # Save to SQLite
+    c.execute("INSERT INTO immigrants VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              (fname, lname, age, dob, sex, country, ethnicity, entrydate, language, visatype))
+    conn.commit()
+
+    # Show success message
+    tkinter.messagebox.showinfo('Success', 'Details added successfully.')
+
+def show_barchart():
+    try:
+        data_categories = {'Business visa': 0, 'Courtesy Visa': 0, 'Diplomatic Visa': 0, 'Facilitation visa': 0, 'General visa': 0, 'Open work permit': 0, 'Quebec skilled worker': 0, 'Temporary visa': 0}
+
+        c.execute("SELECT visa_type FROM immigrants")
+        rows = c.fetchall()
+        for row in rows:
+            category = row[0]
+            if category in data_categories:
+                data_categories[category] += 1
+
+        labels = list(data_categories.keys())
+        values = list(data_categories.values())
+
+        if sum(values) == 0:
+            print('No data to display in the bar chart.')
+            return
+
+        plt.bar(labels, values, color=['magenta', 'purple', 'blue', 'orange', 'red', 'green', 'yellow', 'cyan'])
+        plt.xlabel('Visa Types')
+        plt.ylabel('Number of Immigrants')
+        plt.title('Number of Immigrants by Visa Type')
+        plt.show()
+    except Exception as e:
+        print('Error:', str(e))
+
+def export_to_json():
+    try:
+        data = []
+        c.execute("SELECT * FROM immigrants")
+        rows = c.fetchall()
+        for row in rows:
+            data.append({
+                "first_name": row[0],
+                "last_name": row[1],
+                "age": row[2],
+                "date_of_birth": row[3],
+                "sex": row[4],
+                "country": row[5],
+                "ethnicity": row[6],
+                "entry_date": row[7],
+                "language": row[8],
+                "visa_type": row[9]
+            })
+
+        with open('immigrant_data.json', 'w') as json_file:
+            json.dump(data, json_file, indent=4)
+
+        tkinter.messagebox.showinfo('Success', 'Data exported to immigrant_data.json successfully.')
+    except Exception as e:
+        tkinter.messagebox.showerror('Error', str(e))
+
+window = tkinter.Tk()
+window.title('CANADA IMMIGRANTS CENSUS DATA FORM')
+
+frame = tkinter.Frame(window)
+frame.pack()
+
+immigrantcensorframe = tkinter.LabelFrame(frame, text='Canada Immigrant form entry')
+immigrantcensorframe.grid(row=0, column=0, padx=20, pady=10)
+
+fnamelabel = tkinter.Label(immigrantcensorframe, text='First Name')
+fnamelabel.grid(row=0, column=0)
+fnameentry = tkinter.Entry(immigrantcensorframe)
+fnameentry.grid(row=1, column=0)
+
+lnamelabel = tkinter.Label(immigrantcensorframe, text='Last Name')
+lnamelabel.grid(row=0, column=1)
+lnameentry = tkinter.Entry(immigrantcensorframe)
+lnameentry.grid(row=1, column=1)
+
+agelabel = tkinter.Label(immigrantcensorframe, text='Age')
+agespinbox = tkinter.Spinbox(immigrantcensorframe, from_=0, to=100)
+agelabel.grid(row=0, column=2)
+agespinbox.grid(row=1, column=2)
+
+doblabel = tkinter.Label(immigrantcensorframe, text='Date of Birth(mm/dd/yy)')
+doblabel.grid(row=2, column=0)
+dobentry = tkinter.Entry(immigrantcensorframe)
+dobentry.grid(row=3, column=0)
+
+sexlabel = tkinter.Label(immigrantcensorframe, text='Sex')
+sexlabel.grid(row=2, column=1)
+sexcombo = ttk.Combobox(immigrantcensorframe, values=['Female', 'Male'])
+sexcombo.grid(row=3, column=1)
+
+countryoriginlabel = tkinter.Label(immigrantcensorframe, text='Country of Origin')
+countryoriginlabel.grid(row=4, column=0)
+countryorigincombo = ttk.Combobox(immigrantcensorframe, values=[
+    'Afghanistan', 'Aland Islands', 'Albania', 'Algeria', 'American Samoa', 'Andorra', 'Angola', 'Anguilla', 'Antarctica', 'Antigua and Barbuda',
+    'Argentina', 'Armenia', 'Aruba', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium',
+    'Belize', 'Benin', 'Bermuda', 'Bhutan', 'Bolivia, Plurinational State of', 'Bonaire, Sint Eustatius and Saba', 'Bosnia and Herzegovina',
+    'Botswana', 'Bouvet Island', 'Brazil', 'British Indian Ocean Territory', 'Brunei Darussalam', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cambodia',
+    'Cameroon', 'Canada', 'Cape Verde', 'Cayman Islands', 'Central African Republic', 'Chad', 'Chile', 'China', 'Christmas Island', 'Cocos (Keeling) Islands',
+    'Colombia', 'Comoros', 'Congo', 'Congo, The Democratic Republic of the', 'Cook Islands', 'Costa Rica', "Côte d'Ivoire", 'Croatia', 'Cuba', 'Curaçao',
+    'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea',
+    'Estonia', 'Ethiopia', 'Falkland Islands (Malvinas)', 'Faroe Islands', 'Fiji', 'Finland', 'France', 'French Guiana', 'French Polynesia',
+    'French Southern Territories', 'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Gibraltar', 'Greece', 'Greenland', 'Grenada', 'Guadeloupe',
+    'Guam', 'Guatemala', 'Guernsey', 'Guinea', 'Guinea-Bissau', 'Guyana', 'Haiti', 'Heard Island and McDonald Islands', 'Holy See (Vatican City State)',
+    'Honduras', 'Hong Kong', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran, Islamic Republic of', 'Iraq', 'Ireland', 'Isle of Man', 'Israel',
+    'Italy', 'Jamaica', 'Japan', 'Jersey', 'Jordan', 'Kazakhstan', 'Kenya', 'Kiribati', "Korea, Democratic People's Republic of", 'Korea, Republic of',
+    'Kuwait', 'Kyrgyzstan', "Lao People's Democratic Republic", 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania',
+    'Luxembourg', 'Macao', 'Macedonia, Republic of', 'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Martinique',
+    'Mauritania', 'Mauritius', 'Mayotte', 'Mexico', 'Micronesia, Federated States of', 'Moldova, Republic of', 'Monaco', 'Mongolia', 'Montenegro', 'Montserrat',
+    'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Caledonia', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria',
+    'Niue', 'Norfolk Island', 'Northern Mariana Islands', 'Norway', 'Oman', 'Pakistan', 'Palau', 'Palestinian Territory, Occupied', 'Panama', 'Papua New Guinea',
+    'Paraguay', 'Peru', 'Philippines', 'Pitcairn', 'Poland', 'Portugal', 'Puerto Rico', 'Qatar', 'Réunion', 'Romania', 'Russian Federation', 'Rwanda',
+    'Saint Barthélemy', 'Saint Helena, Ascension and Tristan da Cunha', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Martin (French part)',
+    'Saint Pierre and Miquelon', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia', 'Senegal', 'Serbia',
+    'Seychelles', 'Sierra Leone', 'Singapore', 'Sint Maarten (Dutch part)', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa',
+    'South Georgia and the South Sandwich Islands', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'South Sudan', 'Svalbard and Jan Mayen', 'Swaziland',
+    'Sweden', 'Switzerland', 'Syrian Arab Republic', 'Taiwan, Province of China', 'Tajikistan', 'Tanzania, United Republic of', 'Thailand', 'Timor-Leste',
+    'Togo', 'Tokelau', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Turks and Caicos Islands', 'Tuvalu', 'Uganda', 'Ukraine',
+    'United Arab Emirates', 'United Kingdom', 'United States', 'United States Minor Outlying Islands', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Venezuela, Bolivarian Republic of',
+    'Viet Nam', 'Virgin Islands, British', 'Virgin Islands, U.S.', 'Wallis and Futuna', 'Yemen', 'Zambia', 'Zimbabwe'])
+countryorigincombo.grid(row=5, column=0)
+
+ethnicitylabel = tkinter.Label(immigrantcensorframe, text='Ethnicity')
+ethnicitycombo = ttk.Combobox(immigrantcensorframe, values=[
+    'American Indian', 'Asian', 'Native Hawaiian or other Pacific Islander', 'Black or African American', 'White', 'I do not wish to provide this information'])
+ethnicitylabel.grid(row=4, column=1)
+ethnicitycombo.grid(row=5, column=1)
+
+entrydatelabel = tkinter.Label(immigrantcensorframe, text='Entry Date(mm/dd/yy)')
+entrydatelabel.grid(row=6, column=0)
+entrydateentry = tkinter.Entry(immigrantcensorframe)
+entrydateentry.grid(row=7, column=0)
+
+languagelabel = tkinter.Label(immigrantcensorframe, text='Language')
+languagelabel.grid(row=6, column=1)
+languageentry = tkinter.Entry(immigrantcensorframe)
+languageentry.grid(row=7, column=1)
+
+visatypelabel = tkinter.Label(immigrantcensorframe, text='Visa Type')
+visatypelabel.grid(row=8, column=0)
+visatypecombo = ttk.Combobox(immigrantcensorframe, values=[
+    'Business visa', 'Courtesy Visa', 'Diplomatic Visa', 'Facilitation visa', 'General visa', 'Open work permit', 'Quebec skilled worker', 'Temporary visa'])
+visatypecombo.grid(row=9, column=0)
+
+for widgets in immigrantcensorframe.winfo_children():
+    widgets.grid_configure(padx=20, pady=10)
+
+terms_checklabel = tkinter.Label(immigrantcensorframe, text='Terms & Conditions')
+terms_checklabel.grid(row=10, column=0)
+accept_terms_var = tkinter.StringVar()
+terms_check = tkinter.Checkbutton(immigrantcensorframe, text='I confirm that the information provided above is true to the best of my knowledge',
+                                  variable=accept_terms_var, onvalue='Accepted', offvalue='Not accepted')
+terms_check.grid(row=10, column=1)
+
+savebtn = tkinter.Button(immigrantcensorframe, text='Save', command=save_data)
+savebtn.grid(row=12, column=0)
+
+confirmbtn = tkinter.Button(immigrantcensorframe, text='Confirm Save', command=save_data)
+confirmbtn.grid(row=12, column=1, sticky='news', padx=20, pady=10)
+
+showgraphbtn = tkinter.Button(immigrantcensorframe, text='Show Bar Chart', command=show_barchart)
+showgraphbtn.grid(row=14, column=3)
+
+exportjsonbtn = tkinter.Button(immigrantcensorframe, text='Export to JSON', command=export_to_json)
+exportjsonbtn.grid(row=14, column=4)
+
+window.mainloop()
